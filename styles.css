@@ -1,0 +1,90 @@
+/* GitLab Plugin Styles */
+
+.gitlab-plugin-status {
+	margin: 10px 0;
+	padding: 10px;
+	border-radius: 5px;
+	font-weight: 500;
+}
+
+.gitlab-status-success {
+	background-color: var(--color-green-rgb);
+	background-color: rgba(var(--color-green-rgb), 0.1);
+	color: var(--color-green);
+	border: 1px solid rgba(var(--color-green-rgb), 0.3);
+}
+
+.gitlab-status-warning {
+	background-color: var(--color-orange-rgb);
+	background-color: rgba(var(--color-orange-rgb), 0.1);
+	color: var(--color-orange);
+	border: 1px solid rgba(var(--color-orange-rgb), 0.3);
+}
+
+.gitlab-plugin-help {
+	margin-top: 20px;
+	padding: 15px;
+	background-color: var(--background-secondary);
+	border-radius: 5px;
+}
+
+.gitlab-plugin-help h3 {
+	margin-top: 0;
+	color: var(--text-accent);
+}
+
+.gitlab-plugin-help ol {
+	margin: 10px 0;
+	padding-left: 20px;
+}
+
+.gitlab-plugin-help li {
+	margin: 5px 0;
+	line-height: 1.5;
+}
+
+/*
+
+This CSS file will be included with your plugin, and
+available in the app when your plugin is enabled.
+
+If your plugin does not need CSS, delete this file.
+
+*/
+
+.gitlab-plugin {
+    /* Add your plugin-specific styles here */
+}
+
+.gitlab-button {
+    background-color: #FCA326;
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.gitlab-button:hover {
+    background-color: #e8932a;
+}
+
+.gitlab-modal {
+    /* Styles for GitLab-related modals */
+}
+
+.gitlab-settings {
+    /* Styles for GitLab settings */
+}
+
+.gitlab-icon {
+    /* Styles for GitLab icons */
+    width: 16px;
+    height: 16px;
+}
+

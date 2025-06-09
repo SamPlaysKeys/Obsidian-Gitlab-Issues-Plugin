@@ -1,0 +1,12 @@
+{
+	"id": "obsidian-gitlab-plugin",
+	"name": "GitLab Plugin",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "A plugin for integrating GitLab functionality into Obsidian",
+	"author": "Your Name",
+	"authorUrl": "https://github.com/yourusername",
+	"fundingUrl": "https://github.com/sponsors/yourusername",
+	"isDesktopOnly": false
+}
+

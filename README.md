@@ -106,12 +106,70 @@ Description of the bug...
 
 ## Development
 
-To build the plugin:
+### Initial Setup for Contributors
+
+When cloning this repository for development:
 
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd obsidian-gitlab-plugin
+
+# Install dependencies
 npm install
+
+# Build the plugin
 npm run build
 ```
+
+### Development Workflow
+
+1. **Install Dependencies**: 
+   ```bash
+   npm install
+   ```
+   This recreates the `node_modules` directory with all required packages.
+
+2. **Build for Development**:
+   ```bash
+   npm run dev
+   # or
+   npm run watch
+   ```
+   This starts Rollup in watch mode, automatically rebuilding when you change TypeScript files.
+
+3. **One-time Build**:
+   ```bash
+   npm run build
+   ```
+   Generates the final `main.js` file from TypeScript sources.
+
+4. **Testing Changes**:
+   - Copy `main.js`, `manifest.json`, and `styles.css` to your test vault's plugin directory
+   - Reload Obsidian or use the "Reload app without saving" command
+   - Test your changes in Obsidian
+
+### Project Structure
+
+```
+obsidian-gitlab-plugin/
+├── main.ts              # Main plugin source code
+├── manifest.json        # Plugin metadata
+├── package.json         # Dependencies and scripts
+├── package-lock.json    # Locked dependency versions
+├── tsconfig.json        # TypeScript configuration
+├── rollup.config.js     # Build configuration
+├── styles.css           # Plugin styles (if any)
+├── .gitignore           # Git ignore rules
+└── node_modules/       # Dependencies (auto-generated, not in Git)
+```
+
+### Important Notes
+
+- **`node_modules` is not tracked in Git** - It's regenerated via `npm install`
+- **`main.js` is not tracked in Git** - It's built from `main.ts` via the build process
+- **Always run `npm install`** after cloning or pulling changes
+- **Use `npm run dev`** during development for automatic rebuilding
 
 ## API Usage
 

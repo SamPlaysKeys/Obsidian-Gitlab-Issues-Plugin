@@ -4,9 +4,9 @@
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "A plugin for integrating GitLab functionality into Obsidian",
-	"author": "Your Name",
-	"authorUrl": "https://github.com/yourusername",
-	"fundingUrl": "https://github.com/sponsors/yourusername",
+	"author": "SamPlaysKeys",
+	"authorUrl": "https://github.com/SamPlaysKeys",
+	"fundingUrl": "https://github.com/sponsors/SamPlaysKeys",
 	"isDesktopOnly": false
 }
 

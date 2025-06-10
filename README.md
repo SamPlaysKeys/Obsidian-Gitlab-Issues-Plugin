@@ -121,3 +121,50 @@ The plugin uses Obsidian's `MetadataCache` and `Vault` APIs to:
 - Modify file content using `app.vault.read()` and `app.vault.modify()`
 - Preserve existing frontmatter structure while adding GitLab issue URLs
 
+## Current Issues / Limitations
+
+### Scope Limitations
+The application is currently limited in scope and may not meet the needs of most users:
+
+- **Single Project Limitation**: The plugin is currently designed for a single GitLab project per vault
+- **No Project Selection**: Users cannot dynamically choose which project to create issues in
+- **Limited Workflow Support**: Most users work across multiple projects and need more flexible project management
+
+## Requested Features / Next Steps
+
+### High Priority
+1. **Account-Based Architecture**: Investigate shifting from project-based to account-based authentication
+   - This would allow access to multiple projects under a GitLab account
+   - Better aligns with typical user workflows
+
+2. **Project Selection UI**: Add a dropdown or selection menu during issue creation
+   - Allow users to choose which project to create the issue in
+   - Could include recent projects or favorites for quick access
+   - Display project names alongside IDs for better UX
+
+### Medium Priority
+3. **Group-Based Filtering**: Add option to limit project selection to a specific GitLab group
+   - Helps organize projects for users in large organizations
+   - Reduces clutter in project selection UI
+   - Configurable per vault or globally
+
+### Future Considerations
+4. **Continuous Sync Function** *(Maybe)*: Add regular synchronization capabilities
+   - Sync issue status updates back to Obsidian notes
+   - Update frontmatter with issue state changes
+   - Optional background sync with configurable intervals
+   - **Note**: This would significantly increase complexity and may impact performance
+
+### Technical Considerations
+- Moving to account-based auth will require OAuth flow or personal access tokens with broader scope
+- Project selection UI will need integration with GitLab API to fetch available projects
+- Group filtering requires additional API calls to fetch group memberships
+- Sync functionality would need robust error handling and conflict resolution
+
+## Contributing
+
+Contributions are welcome, especially for the features listed above. Please:
+1. Open an issue to discuss major changes
+2. Follow existing code style and patterns
+3. Add appropriate error handling and user feedback
+4. Test with multiple GitLab configurations

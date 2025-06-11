@@ -1,4 +1,4 @@
-# Obsidian GitLab Plugin
+# Obsidian GitLab Issues Plugin
 
 A plugin for Obsidian that allows you to create GitLab issues directly from your markdown notes.
 
@@ -54,9 +54,7 @@ After installing the plugin, you need to configure it with your GitLab credentia
   - Select scopes: `api` (full API access)
   - Copy the generated token
 
-- **Project ID**: The GitLab project ID where issues will be created
-  - Found in your GitLab project page (usually a number like 12345)
-  - Or in the project URL: `gitlab.com/username/project-name` → Settings → General
+**Note**: Project selection has been preliminarily created with Claude Sonnet 3.5, and tested in multiple scenarios. This required a redesign of some of the core API calls, but the overall functionality is significantly improved.
 
 ### Optional Settings
 
@@ -66,9 +64,13 @@ After installing the plugin, you need to configure it with your GitLab credentia
 
 ## Usage
 
+**Current Status**: The plugin is in development. Issue creation functionality is temporarily disabled while implementing project selection features.
+
+**Future Usage**:
 1. Open a markdown file in Obsidian
 2. Run the command "Create GitLab issue from active file"
 3. The plugin will:
+   - Allow you to select which GitLab project to create the issue in
    - Create a GitLab issue using the file name as the title
    - Use the file content as the issue description
    - Add the GitLab issue URL to the note's frontmatter
@@ -179,14 +181,14 @@ The plugin uses Obsidian's `MetadataCache` and `Vault` APIs to:
 - Modify file content using `app.vault.read()` and `app.vault.modify()`
 - Preserve existing frontmatter structure while adding GitLab issue URLs
 
-## Current Issues / Limitations
+## Current Status / Development Progress
 
-### Scope Limitations
-The application is currently limited in scope and may not meet the needs of most users:
+### Architecture Changes in Progress
+The plugin is being refactored to remove the fixed project ID limitation:
 
-- **Single Project Limitation**: The plugin is currently designed for a single GitLab project per vault
-- **No Project Selection**: Users cannot dynamically choose which project to create issues in
-- **Limited Workflow Support**: Most users work across multiple projects and need more flexible project management
+- **Removed Fixed Project Configuration**: No longer requires a single project ID in settings
+- **Dynamic Project Selection**: Will allow users to choose projects during issue creation
+- **Account-Based Authentication**: Uses personal access tokens for broader project access
 
 ## Requested Features / Next Steps
 

@@ -26,7 +26,7 @@ A plugin for Obsidian that creates GitLab issues directly from your markdown not
 
 ## Configuration
 
-1. Open Obsidian Settings → Plugin Options → GitLab Plugin
+1. Open Obsidian Settings → Plugin Options → GitLab Issues Plugin
 2. Configure:
    - **Personal Access Token**: GitLab token with `api` scope
    - **GitLab URL**: Your GitLab instance URL (defaults to gitlab.com)

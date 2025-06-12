@@ -605,7 +605,7 @@ class SettingsTab extends PluginSettingTab {
 
 		settingsContainer.empty();
 
-		settingsContainer.createEl('h2', {text: 'GitLab Plugin Settings'});
+		settingsContainer.createEl('h2', {text: 'GitLab Issues Plugin Settings'});
 		
 		// Add validation status indicator
 		const validationStatusElement = settingsContainer.createEl('div', { cls: 'gitlab-plugin-status' });

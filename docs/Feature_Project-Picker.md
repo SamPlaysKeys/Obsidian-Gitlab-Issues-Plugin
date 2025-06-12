@@ -2,7 +2,7 @@
 
 ## Motivation
 
-The Project Picker feature addresses a critical limitation in the GitLab Plugin's original design. Initially, the plugin required users to configure a single, fixed project ID in the settings, which severely limited its usefulness for users who work across multiple GitLab projects.
+The Project Picker feature addresses a critical limitation in the GitLab Issues Plugin's original design. Initially, the plugin required users to configure a single, fixed project ID in the settings, which severely limited its usefulness for users who work across multiple GitLab projects.
 
 ### Problems with the Original Approach
 - **Single Project Limitation**: Users could only create issues in one pre-configured project

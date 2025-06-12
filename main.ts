@@ -44,7 +44,7 @@ export default class GitLabPlugin extends Plugin {
 			}
 		});
 
-		// This adds a simple command that can be triggered anywhere
+		/* This adds a simple command that can be triggered anywhere
 		this.addCommand({
 			id: 'open-gitlab-sample-modal',
 			name: 'Open GitLab sample modal',
@@ -52,6 +52,7 @@ export default class GitLabPlugin extends Plugin {
 				console.log('GitLab plugin command executed!');
 			}
 		});
+		*/
 	}
 
 	onunload() {

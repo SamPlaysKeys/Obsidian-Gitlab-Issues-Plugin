@@ -20,7 +20,7 @@ A plugin for Obsidian that creates GitLab issues directly from your markdown not
    ```
 3. Copy `main.js`, `manifest.json`, and `styles.css` to your vault's plugins folder:
    ```
-   YOUR_VAULT/.obsidian/plugins/obsidian-gitlab-plugin/
+   YOUR_VAULT/.obsidian/plugins/obsidian-gitlab-issues-plugin/
    ```
 4. Enable the plugin in Obsidian Settings → Community plugins
 

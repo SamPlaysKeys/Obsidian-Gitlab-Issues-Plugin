@@ -19,7 +19,7 @@ const NEW_TEXT = 'GitLab Issues Plugin';
 
 /**
  * Parse the classification table
- * Format: line_number|file_path:content
+ * Format: file_path:content
  */
 function parseClassificationTable(filePath) {
     if (!fs.existsSync(filePath)) {
@@ -33,19 +33,20 @@ function parseClassificationTable(filePath) {
     const approvedReplacements = [];
     
     for (const line of lines) {
-        const match = line.match(/^(\d+)\|([^:]+):(.*)$/);
-        if (!match) {
-            console.warn(`Skipping malformed line: ${line}`);
+        const colonIndex = line.indexOf(':');
+        if (colonIndex === -1) {
+            console.warn(`Skipping malformed line (no colon): ${line}`);
             continue;
         }
         
-        const [, lineNumber, filePath, content] = match;
+        const filePath = line.substring(0, colonIndex);
+        const content = line.substring(colonIndex + 1);
         
         // Check if the content contains the text we want to replace
         if (content.includes(OLD_TEXT)) {
             approvedReplacements.push({
                 file: filePath,
-                lineNumber: parseInt(lineNumber),
+                searchText: content.trim(),
                 originalContent: content,
                 newContent: content.replace(new RegExp(OLD_TEXT, 'g'), NEW_TEXT)
             });
@@ -74,24 +75,24 @@ function replaceInFile(filePath, replacements) {
     
     let modified = false;
     
-    // Apply replacements
+    // Apply replacements by searching for content
     for (const replacement of replacements) {
-        const lineIndex = replacement.lineNumber - 1; // Convert to 0-based index
+        const searchText = replacement.searchText;
         
-        if (lineIndex >= 0 && lineIndex < lines.length) {
-            const currentLine = lines[lineIndex];
+        // Find the line that contains this exact content
+        for (let i = 0; i < lines.length; i++) {
+            const currentLine = lines[i];
             
-            // Verify the line matches what we expect (safety check)
-            if (currentLine.includes(OLD_TEXT)) {
+            // Check if this line contains the search text (with some flexibility for whitespace)
+            if (currentLine.trim() === searchText.trim() || 
+                (currentLine.includes(OLD_TEXT) && currentLine.trim().includes(searchText.trim()))) {
+                
                 const newLine = currentLine.replace(new RegExp(OLD_TEXT, 'g'), NEW_TEXT);
-                lines[lineIndex] = newLine;
+                lines[i] = newLine;
                 modified = true;
-                console.log(`  Line ${replacement.lineNumber}: ${OLD_TEXT} → ${NEW_TEXT}`);
-            } else {
-                console.warn(`  Line ${replacement.lineNumber}: Content mismatch, skipping`);
+                console.log(`  Line ${i + 1}: ${OLD_TEXT} → ${NEW_TEXT}`);
+                break; // Only replace the first match to be safe
             }
-        } else {
-            console.warn(`  Line ${replacement.lineNumber}: Out of range, skipping`);
         }
     }
     

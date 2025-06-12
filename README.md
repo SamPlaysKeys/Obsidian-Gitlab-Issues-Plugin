@@ -39,10 +39,69 @@ A plugin for Obsidian that creates GitLab issues directly from your markdown not
 3. Select a project from the searchable list
 4. Issue is created and URL added to frontmatter
 
+## Configuration Workflow Flowchart
+```mermaid
+flowchart TD
+    %% Initial Setup and Validation
+    A[User opens markdown file] --> B{Plugin configured?}
+    B -->|No| C[Show configuration error]
+    B -->|Yes| D[User runs Create GitLab issue command]
+    
+    %% File Validation
+    D --> E[Validate active file]
+    E --> F{Is .md file?}
+    F -->|No| G[Show file type error]
+    F -->|Yes| H[Show project picker modal]
+    
+    %% Project Selection
+    H --> I[Load user's GitLab projects]
+    I --> J{API call successful?}
+    J -->|No| K[Show API error message]
+    J -->|Yes| L[Display projects in searchable list]
+    
+    L --> M[User searches/selects project]
+    M --> N{Project selected?}
+    N -->|No| O[Cancel operation]
+    N -->|Yes| P[Extract file title and content]
+    
+    %% Issue Creation Process
+    P --> Q[Transform markdown content]
+    Q --> R[Create GitLab issue via API]
+    R --> S{Issue creation successful?}
+    S -->|No| T[Show creation error]
+    S -->|Yes| U[Update file frontmatter with issue URL]
+    
+    %% Final Steps
+    U --> V{Frontmatter update successful?}
+    V -->|No| W[Show success with warning]
+    V -->|Yes| X[Show success message with issue URL]
+    
+    %% Terminal states - all paths lead to end
+    C --> Z[End]
+    G --> Z
+    K --> Z
+    O --> Z
+    T --> Z
+    W --> Z
+    X --> Z
+    
+    %% Styling
+    classDef errorState fill:#ffcccc,stroke:#cc0000
+    classDef successState fill:#ccffcc,stroke:#00cc00
+    classDef processState fill:#ccccff,stroke:#0000cc
+    classDef decisionState fill:#ffffcc,stroke:#cccc00
+    
+    class C,G,K,T errorState
+    class X,W successState
+    class A,D,E,H,I,L,M,P,Q,R,U processState
+    class B,F,J,N,S,V decisionState
+```
+
 ## Example
 
 **Before:**
 ```markdown
+
 # Bug Report
 
 Description of the bug...

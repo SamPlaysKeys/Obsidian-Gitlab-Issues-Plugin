@@ -8,6 +8,10 @@ yarn-error.log*
 main.js
 main.js.map
 *.js.map
+main.d.ts
+main.d.ts.map
+*.d.ts.map
+types.d.ts
 
 # TypeScript cache
 *.tsbuildinfo

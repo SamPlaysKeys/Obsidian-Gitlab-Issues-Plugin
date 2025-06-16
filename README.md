@@ -1,100 +1,113 @@
-# Obsidian GitLab Plugin
+# Obsidian GitLab Issues Plugin
 
-A plugin for Obsidian that allows you to create GitLab issues directly from your markdown notes.
+A plugin for Obsidian that creates GitLab issues directly from your markdown notes with project selection.
 
 ## Features
 
-- Create GitLab issues from active markdown files
-- Automatically updates note frontmatter with GitLab issue URLs
-- Configurable default labels
-- Transforms Obsidian-specific markdown for GitLab compatibility
-
-## Setup
+- **Project Selection**: Choose from your accessible GitLab projects during issue creation
+- **Issue Creation**: Create GitLab issues using file name as title and content as description
+- **Frontmatter Integration**: Automatically adds GitLab issue URLs to note frontmatter
+- **Configurable Labels**: Set default labels to apply to all created issues
+- **Multi-Instance Support**: Works with GitLab.com and self-hosted GitLab instances
 
 ## Installation
 
-### Method 1: Manual Installation (Recommended for Development)
-
-1. Download or clone this repository
+1. Clone this repository
 2. Build the plugin:
    ```bash
    npm install
    npm run build
    ```
-3. Copy the built files to your Obsidian vault's plugins folder:
-   ```bash
-   # Create the plugin directory
-   mkdir -p "PATH_TO_YOUR_VAULT/.obsidian/plugins/obsidian-gitlab-plugin"
-   
-   # Copy the necessary files
-   cp main.js manifest.json styles.css "PATH_TO_YOUR_VAULT/.obsidian/plugins/obsidian-gitlab-plugin/"
+3. Copy `main.js`, `manifest.json`, and `styles.css` to your vault's plugins folder:
    ```
-4. Restart Obsidian or reload plugins
-5. Enable the plugin in Settings → Community plugins
-
-### Method 2: From Obsidian Community Plugins (When Available)
-
-1. Open Settings in Obsidian
-2. Go to Community plugins
-3. Browse for "GitLab Plugin"
-4. Install and enable
+   YOUR_VAULT/.obsidian/plugins/obsidian-gitlab-issues-plugin/
+   ```
+4. Enable the plugin in Obsidian Settings → Community plugins
 
 ## Configuration
 
-After installing the plugin, you need to configure it with your GitLab credentials:
-
-1. Open Obsidian Settings
-2. Navigate to "Plugin Options" → "GitLab Plugin"
-3. Configure the following settings:
-
-### Required Settings
-
-- **Personal Access Token**: Your GitLab personal access token with `api` scope
-  - To create a token: Go to GitLab → User Settings → Access Tokens
-  - Select scopes: `api` (full API access)
-  - Copy the generated token
-
-- **Project ID**: The GitLab project ID where issues will be created
-  - Found in your GitLab project page (usually a number like 12345)
-  - Or in the project URL: `gitlab.com/username/project-name` → Settings → General
-
-### Optional Settings
-
-- **Default Labels**: Comma-separated list of labels to apply to all issues
-  - Example: `bug,documentation,enhancement`
-  - Labels must already exist in your GitLab project
+1. Open Obsidian Settings → Plugin Options → GitLab Issues Plugin
+2. Configure:
+   - **Personal Access Token**: GitLab token with `api` scope
+   - **GitLab URL**: Your GitLab instance URL (defaults to gitlab.com)
+   - **Default Labels**: Optional comma-separated labels for issues
 
 ## Usage
 
 1. Open a markdown file in Obsidian
-2. Run the command "Create GitLab issue from active file"
-3. The plugin will:
-   - Create a GitLab issue using the file name as the title
-   - Use the file content as the issue description
-   - Add the GitLab issue URL to the note's frontmatter
+2. Run command: "Create GitLab issue from active file"
+3. Select a project from the searchable list
+4. Issue is created and URL added to frontmatter
 
-## Frontmatter Integration
-
-After creating a GitLab issue, the plugin automatically updates your note's frontmatter with the issue URL:
-
-```yaml
----
-gitlab_issue_url: "https://gitlab.com/your-project/-/issues/123"
----
+## Configuration Workflow Flowchart
+```mermaid
+flowchart TD
+    %% Initial Setup and Validation
+    A[User opens markdown file] --> B{Plugin configured?}
+    B -->|No| C[Show configuration error]
+    B -->|Yes| D[User runs Create GitLab issue command]
+    
+    %% File Validation
+    D --> E[Validate active file]
+    E --> F{Is .md file?}
+    F -->|No| G[Show file type error]
+    F -->|Yes| H[Show project picker modal]
+    
+    %% Project Selection
+    H --> I[Load user's GitLab projects]
+    I --> J{API call successful?}
+    J -->|No| K[Show API error message]
+    J -->|Yes| L[Display projects in searchable list]
+    
+    L --> M[User searches/selects project]
+    M --> N{Project selected?}
+    N -->|No| O[Cancel operation]
+    N -->|Yes| P[Extract file title and content]
+    
+    %% Issue Creation Process
+    P --> Q[Transform markdown content]
+    Q --> R[Create GitLab issue via API]
+    R --> S{Issue creation successful?}
+    S -->|No| T[Show creation error]
+    S -->|Yes| U[Update file frontmatter with issue URL]
+    
+    %% Final Steps
+    U --> V{Frontmatter update successful?}
+    V -->|No| W[Show success with warning]
+    V -->|Yes| X[Show success message with issue URL]
+    
+    %% Terminal states - all paths lead to end
+    C --> Z[End]
+    G --> Z
+    K --> Z
+    O --> Z
+    T --> Z
+    W --> Z
+    X --> Z
+    
+    %% Styling
+    classDef errorState fill:#ffcccc,stroke:#cc0000
+    classDef successState fill:#ccffcc,stroke:#00cc00
+    classDef processState fill:#ccccff,stroke:#0000cc
+    classDef decisionState fill:#ffffcc,stroke:#cccc00
+    
+    class C,G,K,T errorState
+    class X,W successState
+    class A,D,E,H,I,L,M,P,Q,R,U processState
+    class B,F,J,N,S,V decisionState
 ```
-
-If your note already has frontmatter, the `gitlab_issue_url` property will be added or updated. If no frontmatter exists, it will be created.
 
 ## Example
 
-**Before creating issue:**
+**Before:**
 ```markdown
+
 # Bug Report
 
 Description of the bug...
 ```
 
-**After creating issue:**
+**After:**
 ```markdown
 ---
 gitlab_issue_url: "https://gitlab.com/your-project/-/issues/123"
@@ -106,123 +119,17 @@ Description of the bug...
 
 ## Development
 
-### Initial Setup for Contributors
-
-When cloning this repository for development:
-
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd obsidian-gitlab-plugin
-
-# Install dependencies
+# Setup
 npm install
 
-# Build the plugin
+# Development build (watch mode)
+npm run dev
+
+# Production build
 npm run build
 ```
 
-### Development Workflow
-
-1. **Install Dependencies**: 
-   ```bash
-   npm install
-   ```
-   This recreates the `node_modules` directory with all required packages.
-
-2. **Build for Development**:
-   ```bash
-   npm run dev
-   # or
-   npm run watch
-   ```
-   This starts Rollup in watch mode, automatically rebuilding when you change TypeScript files.
-
-3. **One-time Build**:
-   ```bash
-   npm run build
-   ```
-   Generates the final `main.js` file from TypeScript sources.
-
-4. **Testing Changes**:
-   - Copy `main.js`, `manifest.json`, and `styles.css` to your test vault's plugin directory
-   - Reload Obsidian or use the "Reload app without saving" command
-   - Test your changes in Obsidian
-
-### Project Structure
-
-```
-obsidian-gitlab-plugin/
-├── main.ts              # Main plugin source code
-├── manifest.json        # Plugin metadata
-├── package.json         # Dependencies and scripts
-├── package-lock.json    # Locked dependency versions
-├── tsconfig.json        # TypeScript configuration
-├── rollup.config.js     # Build configuration
-├── styles.css           # Plugin styles (if any)
-├── .gitignore           # Git ignore rules
-└── node_modules/       # Dependencies (auto-generated, not in Git)
-```
-
-### Important Notes
-
-- **`node_modules` is not tracked in Git** - It's regenerated via `npm install`
-- **`main.js` is not tracked in Git** - It's built from `main.ts` via the build process
-- **Always run `npm install`** after cloning or pulling changes
-- **Use `npm run dev`** during development for automatic rebuilding
-
-## API Usage
-
-The plugin uses Obsidian's `MetadataCache` and `Vault` APIs to:
-
-- Read and write frontmatter using `app.metadataCache.getFileCache()`
-- Modify file content using `app.vault.read()` and `app.vault.modify()`
-- Preserve existing frontmatter structure while adding GitLab issue URLs
-
-## Current Issues / Limitations
-
-### Scope Limitations
-The application is currently limited in scope and may not meet the needs of most users:
-
-- **Single Project Limitation**: The plugin is currently designed for a single GitLab project per vault
-- **No Project Selection**: Users cannot dynamically choose which project to create issues in
-- **Limited Workflow Support**: Most users work across multiple projects and need more flexible project management
-
-## Requested Features / Next Steps
-
-### High Priority
-1. **Account-Based Architecture**: Investigate shifting from project-based to account-based authentication
-   - This would allow access to multiple projects under a GitLab account
-   - Better aligns with typical user workflows
-
-2. **Project Selection UI**: Add a dropdown or selection menu during issue creation
-   - Allow users to choose which project to create the issue in
-   - Could include recent projects or favorites for quick access
-   - Display project names alongside IDs for better UX
-
-### Medium Priority
-3. **Group-Based Filtering**: Add option to limit project selection to a specific GitLab group
-   - Helps organize projects for users in large organizations
-   - Reduces clutter in project selection UI
-   - Configurable per vault or globally
-
-### Future Considerations
-4. **Continuous Sync Function** *(Maybe)*: Add regular synchronization capabilities
-   - Sync issue status updates back to Obsidian notes
-   - Update frontmatter with issue state changes
-   - Optional background sync with configurable intervals
-   - **Note**: This would significantly increase complexity and may impact performance
-
-### Technical Considerations
-- Moving to account-based auth will require OAuth flow or personal access tokens with broader scope
-- Project selection UI will need integration with GitLab API to fetch available projects
-- Group filtering requires additional API calls to fetch group memberships
-- Sync functionality would need robust error handling and conflict resolution
-
 ## Contributing
 
-Contributions are welcome, especially for the features listed above. Please:
-1. Open an issue to discuss major changes
-2. Follow existing code style and patterns
-3. Add appropriate error handling and user feedback
-4. Test with multiple GitLab configurations
+Contributions welcome! Please test with multiple GitLab configurations before submitting.

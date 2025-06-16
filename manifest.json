@@ -1,12 +1,11 @@
 {
-	"id": "obsidian-gitlab-plugin",
-	"name": "GitLab Plugin",
-	"version": "1.0.0",
+	"id": "obsidian-gitlab-issues-plugin",
+	"name": "GitLab Issues Plugin",
+	"version": "1.0.1",
 	"minAppVersion": "0.15.0",
-	"description": "A plugin for integrating GitLab functionality into Obsidian",
-	"author": "SamPlaysKeys",
+	"description": "A plugin for integrating GitLab issue functionality into Obsidian",
+	"author": "Sam Fleming",
 	"authorUrl": "https://github.com/SamPlaysKeys",
-	"fundingUrl": "https://github.com/sponsors/SamPlaysKeys",
 	"isDesktopOnly": false
 }
 

@@ -1,17 +1,31 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, Notice } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, Notice, FuzzySuggestModal, FuzzyMatch } from 'obsidian';
+import { GitLabProject, fetchUserProjects } from './types';
 
+/**
+ * Configuration settings for the GitLab plugin
+ */
 interface GitLabSettings {
+	/** GitLab Personal Access Token for API authentication */
 	token: string;
-	projectId: string;
+	/** Comma-separated list of default labels to apply to created issues */
 	defaultLabels: string;
+	/** Base URL of the GitLab instance */
+	gitlabUrl: string;
 }
 
+/**
+ * Default plugin settings
+ */
 const DEFAULT_SETTINGS: GitLabSettings = {
 	token: '',
-	projectId: '',
-	defaultLabels: ''
+	defaultLabels: '',
+	gitlabUrl: 'https://gitlab.com'
 };
 
+/**
+ * Main GitLab plugin class for Obsidian
+ * Provides functionality to create GitLab issues from markdown notes
+ */
 export default class GitLabPlugin extends Plugin {
 	settings!: GitLabSettings;
 
@@ -30,7 +44,7 @@ export default class GitLabPlugin extends Plugin {
 			}
 		});
 
-		// This adds a simple command that can be triggered anywhere
+		/* This adds a simple command that can be triggered anywhere
 		this.addCommand({
 			id: 'open-gitlab-sample-modal',
 			name: 'Open GitLab sample modal',
@@ -38,6 +52,7 @@ export default class GitLabPlugin extends Plugin {
 				console.log('GitLab plugin command executed!');
 			}
 		});
+		*/
 	}
 
 	onunload() {
@@ -45,17 +60,28 @@ export default class GitLabPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const savedData = await this.loadData();
+		
+		// Migration: Remove deprecated projectId field if it exists in saved data
+		if (savedData && 'projectId' in savedData) {
+			console.log('Migrating settings: removing deprecated projectId field');
+			delete savedData.projectId;
+		}
+		
+		// Merge with defaults, ensuring only valid settings are preserved
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
 
-	private createIssueFromActiveFile() {
+	private async createIssueFromActiveFile() {
 		try {
-			// Validate settings before proceeding
-			if (!this.validateSettings()) {
+			// Validate token only
+			if (!this.settings.token || this.settings.token.trim() === '') {
+				new Notice('GitLab Personal Access Token is required. Please configure it in plugin settings.');
+				console.error('GitLab token not configured');
 				return;
 			}
 
@@ -77,14 +103,27 @@ export default class GitLabPlugin extends Plugin {
 			console.log('Creating GitLab issue from file:', activeFile.path);
 			new Notice('Creating GitLab issue...');
 			
-			this.triggerIssueCreation(activeFile);
+			// Instantiate ProjectPickerModal and await selected project
+			const projectPicker = new ProjectPickerModal(this.app, this.settings.token, this.settings.gitlabUrl);
+			const selectedProject = await projectPicker.selectProject();
+			
+			if (!selectedProject) {
+				new Notice('No project selected. Issue creation cancelled.');
+				console.log('Project selection cancelled by user');
+				return;
+			}
+			
+			console.log('Selected project:', selectedProject.path_with_namespace);
+			
+			// Pass project.id to triggerIssueCreation
+			this.triggerIssueCreation(activeFile, selectedProject.id);
 		} catch (error) {
 			console.error('Error in createIssueFromActiveFile:', error);
 			new Notice('An unexpected error occurred while preparing to create the GitLab issue.');
 		}
 	}
 	
-	private async triggerIssueCreation(file: TFile) {
+	private async triggerIssueCreation(file: TFile, projectId: number) {
 		try {
 			// Read file content and title
 			const content = await this.app.vault.read(file);
@@ -96,7 +135,7 @@ export default class GitLabPlugin extends Plugin {
 			}
 			
 			// Create GitLab issue
-			const issueUrl = await this.createGitLabIssue(title, content);
+			const issueUrl = await this.createGitLabIssue(title, content, projectId);
 			
 			if (issueUrl) {
 				try {
@@ -125,20 +164,15 @@ export default class GitLabPlugin extends Plugin {
 	 * Creates a GitLab issue from note title and content
 	 * @param title - The note title to use as issue title
 	 * @param content - The markdown content to use as issue description
+	 * @param projectId - The GitLab project ID to create the issue in
 	 * @returns Promise<string | null> - The web_url of the created issue or null if failed
 	 */
-	private async createGitLabIssue(title: string, content: string): Promise<string | null> {
+	private async createGitLabIssue(title: string, content: string, projectId: number): Promise<string | null> {
 		try {
 			// Validate required settings - this should already be done, but double-check
 			if (!this.settings.token) {
 				console.error('GitLab token not configured');
 				new Notice('Please configure your GitLab Personal Access Token in plugin settings');
-				return null;
-			}
-			
-			if (!this.settings.projectId) {
-				console.error('GitLab project ID not configured');
-				new Notice('Please configure your GitLab Project ID in plugin settings');
 				return null;
 			}
 			
@@ -156,70 +190,71 @@ export default class GitLabPlugin extends Plugin {
 			console.log('Sending GitLab API request with data:', { ...issueData, description: transformedContent.substring(0, 100) + '...' });
 			
 			try {
-				// Send POST request to GitLab API
-				const response = await fetch(`https://gitlab.com/api/v4/projects/${this.settings.projectId}/issues`, {
+				// Create the GitLab issue using the provided projectId
+				const baseUrl = this.settings.gitlabUrl.replace(/\/$/, '');
+				const url = `${baseUrl}/api/v4/projects/${projectId}/issues`;
+				
+				const response = await fetch(url, {
 					method: 'POST',
 					headers: {
-						'Content-Type': 'application/json',
-						'Private-Token': this.settings.token
+						'Authorization': `Bearer ${this.settings.token}`,
+						'Content-Type': 'application/json'
 					},
-					body: JSON.stringify(issueData)
+					body: JSON.stringify(issueData),
+					// Add timeout to prevent hanging requests
+					signal: AbortSignal.timeout(30000) // 30 second timeout
 				});
 				
 				if (!response.ok) {
 					let errorMessage = `GitLab API request failed with status ${response.status}`;
 					
-					try {
-						const errorData = await response.json();
-						if (errorData.message) {
-							errorMessage += `: ${errorData.message}`;
-						}
-						} catch {
-							// If JSON parsing fails, use text
-							const errorText = await response.text();
-							if (errorText) {
-								errorMessage += `: ${errorText}`;
-							}
-						}
-					
-					console.error('GitLab API error:', response.status, errorMessage);
-					
-					// Provide specific error feedback based on status code
 					if (response.status === 401) {
-						new Notice('Authentication failed. Please check your GitLab Personal Access Token.');
+						errorMessage = 'Invalid or expired GitLab Personal Access Token. Please check your token in plugin settings.';
 					} else if (response.status === 403) {
-						new Notice('Access denied. Please check your token permissions and project access.');
+						errorMessage = 'Access denied. Please ensure your token has proper permissions for this project.';
 					} else if (response.status === 404) {
-						new Notice('Project not found. Please check your Project ID.');
+						errorMessage = 'Project not found. Please verify the project exists and you have access.';
 					} else if (response.status >= 500) {
-						new Notice('GitLab server error. Please try again later.');
+						errorMessage = 'GitLab server error. Please try again later.';
 					} else {
-						new Notice(`GitLab API error: ${errorMessage}`);
+						// Try to extract error message from response body
+						try {
+							const errorData = await response.json();
+							if (errorData.message) {
+								errorMessage += `: ${errorData.message}`;
+							}
+						} catch {
+							// Ignore JSON parse errors, use default message
+						}
 					}
 					
-					return null;
+					console.error('GitLab API error:', {
+						status: response.status,
+						statusText: response.statusText,
+						url: url
+					});
+					
+					throw new Error(errorMessage);
 				}
 				
-				// Parse JSON response and extract web_url
-				const responseData = await response.json();
-				console.log('GitLab API response:', responseData);
+				const issueResponse = await response.json();
 				
-				// Validate response data
-				if (!responseData.web_url) {
-					console.error('Invalid GitLab API response: missing web_url');
-					new Notice('Invalid response from GitLab API. Issue may have been created but URL is missing.');
-					return null;
+				if (!issueResponse.web_url) {
+					throw new Error('Invalid response from GitLab API: missing web_url');
 				}
 				
-				// Return the web_url from the response
-				return responseData.web_url;
+				console.log('Successfully created GitLab issue:', issueResponse.web_url);
+				return issueResponse.web_url;
 				
 			} catch (networkError) {
-				console.error('Network error calling GitLab API:', networkError);
+				console.error('Error in issue creation:', networkError);
+				
 				if (networkError instanceof TypeError && networkError.message.includes('fetch')) {
 					new Notice('Network error: Unable to connect to GitLab. Please check your internet connection.');
+				} else if (networkError instanceof DOMException && networkError.name === 'AbortError') {
+					new Notice('Request timeout: GitLab API request took too long. Please try again.');
 				} else {
-					new Notice(`Network error: ${networkError instanceof Error ? networkError.message : 'Unknown error'}`);
+					new Notice(`Error: ${networkError instanceof Error ? networkError.message : 'Unknown error'}`);
 				}
 				return null;
 			}
@@ -365,18 +400,6 @@ export default class GitLabPlugin extends Plugin {
 			issues.push('GitLab Personal Access Token is required');
 		}
 		
-		if (!this.settings.projectId || this.settings.projectId.trim() === '') {
-			issues.push('GitLab Project ID is required');
-		}
-		
-		// Validate project ID format (should be numeric or namespace/project format)
-		if (this.settings.projectId && this.settings.projectId.trim() !== '') {
-			const projectId = this.settings.projectId.trim();
-			// Allow numeric IDs or namespace/project format
-			if (!/^\d+$/.test(projectId) && !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(projectId)) {
-				issues.push('Project ID should be either a numeric ID or in "namespace/project" format');
-			}
-		}
 		
 		// Validate token format (basic check)
 		if (this.settings.token && this.settings.token.trim() !== '') {
@@ -398,6 +421,178 @@ export default class GitLabPlugin extends Plugin {
 	}
 }
 
+/**
+ * Modal for selecting a GitLab project from user's accessible projects
+ */
+class ProjectPickerModal extends FuzzySuggestModal<GitLabProject> {
+	private resolvePromise!: (project: GitLabProject | null) => void;
+	private cachedProjects: GitLabProject[] | null = null;
+	private isLoading = false;
+	private selectedProject: GitLabProject | null = null;
+	private token: string;
+	private baseUrl: string;
+
+	constructor(app: App, token: string, baseUrl: string = 'https://gitlab.com') {
+		super(app);
+		this.token = token;
+		this.baseUrl = baseUrl;
+		this.setPlaceholder('Type to search for projects...');
+	}
+
+	/**
+	 * Opens the modal and returns a promise that resolves with the selected project
+	 * @returns Promise<GitLabProject | null> - Selected project or null if cancelled
+	 */
+	public selectProject(): Promise<GitLabProject | null> {
+return new Promise(async (resolve) => {
+			this.resolvePromise = resolve;
+			this.selectedProject = null; // Reset selection
+			await this.loadProjectsAsync();
+			this.open();
+		});
+	}
+
+	/**
+	 * Loads projects asynchronously and updates the modal
+	 */
+	private async loadProjectsAsync(): Promise<void> {
+		if (this.isLoading || this.cachedProjects !== null) {
+			return;
+		}
+
+		this.isLoading = true;
+		try {
+			console.log('Loading GitLab projects...');
+			this.cachedProjects = await fetchUserProjects(this.token, this.baseUrl);
+			console.log(`Successfully loaded ${this.cachedProjects.length} projects for picker modal`);
+		} catch (error) {
+			console.error('Error fetching projects in ProjectPickerModal:', error);
+			
+			// Show error notice to user
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+			new Notice(`Failed to load projects: ${errorMessage}`, 8000);
+			
+			// Set empty array to prevent further loading attempts
+			this.cachedProjects = [];
+		} finally {
+			this.isLoading = false;
+		}
+	}
+
+	/**
+	 * Returns the list of projects synchronously (required by FuzzySuggestModal)
+	 * @returns GitLabProject[] - Array of user projects
+	 */
+	getItems(): GitLabProject[] {
+		console.log('getItems called, returning:', this.cachedProjects?.length || 0, 'projects');
+		return this.cachedProjects ?? [];
+	}
+
+	/**
+	 * Returns the text to display for each project in the search list
+	 * @param project - GitLab project object
+	 * @returns string - Text to display and search against
+	 */
+	getItemText(project: GitLabProject): string {
+		return project.path_with_namespace;
+	}
+
+	/**
+	 * Renders each project item in the suggestion list
+	 * @param fuzzyMatch - Fuzzy match result containing the GitLab project
+	 * @param el - HTML element to render into
+	 */
+	renderSuggestion(fuzzyMatch: FuzzyMatch<GitLabProject>, el: HTMLElement): void {
+		const project = fuzzyMatch.item;
+		const container = el.createDiv({ cls: 'gitlab-project-suggestion' });
+		
+		// Project name (main title)
+		const nameEl = container.createDiv({ cls: 'gitlab-project-name' });
+		nameEl.textContent = project.name;
+		
+		// Project path (namespace/project)
+		const pathEl = container.createDiv({ cls: 'gitlab-project-path' });
+		pathEl.textContent = project.path_with_namespace;
+		
+		// Project description (if available)
+		if (project.description && project.description.trim()) {
+			const descEl = container.createDiv({ cls: 'gitlab-project-description' });
+			descEl.textContent = project.description;
+		}
+	}
+
+	/**
+	 * Required by FuzzySuggestModal but not used (selectSuggestion is called instead)
+	 * @param project - Selected GitLab project
+	 * @param evt - The event that triggered the selection
+	 */
+	onChooseItem(project: GitLabProject, evt: MouseEvent | KeyboardEvent): void {
+		console.log('=== onChooseItem called (fallback) ===');
+		console.log('Selected project:', project.path_with_namespace);
+		
+		// Store the selected project
+		this.selectedProject = project;
+		console.log('Project stored for resolution:', this.selectedProject.path_with_namespace);
+		
+		// Close the modal - this will trigger onClose which will resolve the promise
+		this.close();
+	}
+
+	/**
+	 * This is the method that Obsidian's FuzzySuggestModal actually calls
+	 * @param item - FuzzyMatch containing the selected GitLab project
+	 * @param evt - The event that triggered the selection
+	 */
+	selectSuggestion(item: FuzzyMatch<GitLabProject>, evt: MouseEvent | KeyboardEvent): void {
+		console.log('=== selectSuggestion called ===');
+		console.log('Selected project:', item.item.path_with_namespace);
+		
+		// Store the selected project
+		this.selectedProject = item.item;
+		console.log('Project stored for resolution:', this.selectedProject.path_with_namespace);
+		
+		// Close the modal - this will trigger onClose which will resolve the promise
+		this.close();
+	}
+
+	/**
+	 * Called when modal is closed
+	 */
+onClose(): void {
+		console.log('=== onClose called ===');
+		
+		super.onClose();
+		
+		// Add a small delay before resolving with null to give onChooseItem a chance
+if (this.resolvePromise) {
+			console.log('Resolving promise with selected project:', this.selectedProject);
+			this.resolvePromise(this.selectedProject);
+		}
+	}
+
+	/**
+	 * Handle case when no projects are found
+	 * @param query - Current search query
+	 */
+	getEmptyInputSuggestion(query: string): string {
+		if (this.isLoading) {
+			return 'Loading projects...';
+		}
+		if (this.cachedProjects !== null && this.cachedProjects.length === 0) {
+			return 'No projects found. Make sure you have access to GitLab projects.';
+		}
+		return 'Type to search for projects...';
+	}
+
+	/**
+	 * Handle case when search query yields no results
+	 * @param query - Current search query
+	 */
+	getNoSuggestionMessage(query: string): string {
+		return `No projects found matching "${query}"`;
+	}
+}
+
 class SettingsTab extends PluginSettingTab {
 	plugin: GitLabPlugin;
 
@@ -407,27 +602,27 @@ class SettingsTab extends PluginSettingTab {
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const {containerEl: settingsContainer} = this;
 
-		containerEl.empty();
+		settingsContainer.empty();
 
-		containerEl.createEl('h2', {text: 'GitLab Plugin Settings'});
+		settingsContainer.createEl('h2', {text: 'GitLab Issues Plugin Settings'});
 		
 		// Add validation status indicator
-		const statusEl = containerEl.createEl('div', { cls: 'gitlab-plugin-status' });
-		this.updateValidationStatus(statusEl);
+		const validationStatusElement = settingsContainer.createEl('div', { cls: 'gitlab-plugin-status' });
+		this.updateValidationStatus(validationStatusElement);
 
-		new Setting(containerEl)
+		new Setting(settingsContainer)
 			.setName('Personal Access Token')
 			.setDesc('Your GitLab personal access token (required). Create one at GitLab.com → User Settings → Access Tokens')
 			.addText(text => {
 				text.setPlaceholder('glpat-xxxxxxxxxxxxxxxxxxxx')
 					.setValue(this.plugin.settings.token)
-					.onChange(async (value) => {
+					.onChange(async (tokenValue) => {
 						try {
-							this.plugin.settings.token = value;
+							this.plugin.settings.token = tokenValue;
 							await this.plugin.saveSettings();
-							this.updateValidationStatus(statusEl);
+							this.updateValidationStatus(validationStatusElement);
 						} catch (error) {
 							console.error('Error saving token:', error);
 							new Notice('Failed to save Personal Access Token');
@@ -437,67 +632,67 @@ class SettingsTab extends PluginSettingTab {
 				text.inputEl.type = 'password';
 			});
 
-		new Setting(containerEl)
-			.setName('Project ID')
-			.setDesc('The GitLab project ID (required). Can be numeric (e.g., "12345") or namespace/project format (e.g., "mygroup/myproject")')
-			.addText(text => text
-				.setPlaceholder('12345 or mygroup/myproject')
-				.setValue(this.plugin.settings.projectId)
-				.onChange(async (value) => {
-					try {
-						this.plugin.settings.projectId = value;
-						await this.plugin.saveSettings();
-						this.updateValidationStatus(statusEl);
-					} catch (error) {
-						console.error('Error saving project ID:', error);
-						new Notice('Failed to save Project ID');
-					}
-				}));
 
-		new Setting(containerEl)
+		new Setting(settingsContainer)
 			.setName('Default Labels')
 			.setDesc('Comma-separated list of default labels for issues (optional)')
 			.addText(text => text
 				.setPlaceholder('bug, enhancement, documentation')
 				.setValue(this.plugin.settings.defaultLabels)
-				.onChange(async (value) => {
+				.onChange(async (defaultLabelsValue) => {
 					try {
-						this.plugin.settings.defaultLabels = value;
+						this.plugin.settings.defaultLabels = defaultLabelsValue;
 						await this.plugin.saveSettings();
 					} catch (error) {
 						console.error('Error saving default labels:', error);
 						new Notice('Failed to save Default Labels');
 					}
 				}));
+
+		new Setting(settingsContainer)
+			.setName('GitLab Instance URL')
+			.setDesc('GitLab instance base URL (defaults to https://gitlab.com)')
+			.addText(text => text
+				.setPlaceholder('https://gitlab.com')
+				.setValue(this.plugin.settings.gitlabUrl)
+				.onChange(async (gitlabUrlValue) => {
+					try {
+						this.plugin.settings.gitlabUrl = gitlabUrlValue || 'https://gitlab.com';
+						await this.plugin.saveSettings();
+					} catch (error) {
+						console.error('Error saving GitLab URL:', error);
+						new Notice('Failed to save GitLab URL');
+					}
+				}));
 		
 		// Add help section
-		const helpEl = containerEl.createEl('div', { cls: 'gitlab-plugin-help' });
-		helpEl.createEl('h3', { text: 'Setup Instructions' });
-		const helpList = helpEl.createEl('ol');
-		helpList.createEl('li', { text: 'Go to GitLab.com → User Settings → Access Tokens' });
-		helpList.createEl('li', { text: 'Create a new token with "api" scope' });
-		helpList.createEl('li', { text: 'Copy the token and paste it above' });
-		helpList.createEl('li', { text: 'Find your project ID in Project Settings → General' });
+		const helpSectionElement = settingsContainer.createEl('div', { cls: 'gitlab-plugin-help' });
+		helpSectionElement.createEl('h3', { text: 'Setup Instructions' });
+		const helpInstructionsList = helpSectionElement.createEl('ol');
+		helpInstructionsList.createEl('li', { text: 'Go to GitLab.com → User Settings → Access Tokens' });
+		helpInstructionsList.createEl('li', { text: 'Create a new token with "api" scope' });
+		helpInstructionsList.createEl('li', { text: 'Copy the token and paste it above' });
+		helpInstructionsList.createEl('li', { text: 'Use "Create GitLab issue from active file" command to create issues' });
+		helpInstructionsList.createEl('li', { text: 'Note: You will select the project each time you create an issue' });
 	}
 	
 	private updateValidationStatus(statusEl: HTMLElement): void {
 		statusEl.empty();
 		
 		const hasToken = this.plugin.settings.token && this.plugin.settings.token.trim() !== '';
-		const hasProjectId = this.plugin.settings.projectId && this.plugin.settings.projectId.trim() !== '';
 		
-		if (hasToken && hasProjectId) {
+		if (hasToken) {
 			statusEl.createEl('div', { 
-				text: '✅ Configuration appears valid', 
+				text: '✅ Ready to create GitLab issues', 
 				cls: 'gitlab-status-success'
 			});
-		} else {
-			const missing = [];
-			if (!hasToken) missing.push('Personal Access Token');
-			if (!hasProjectId) missing.push('Project ID');
-			
 			statusEl.createEl('div', { 
-				text: `⚠️ Missing required fields: ${missing.join(', ')}`, 
+				text: 'ℹ️ Project will be selected when creating each issue', 
+				cls: 'gitlab-status-info'
+			});
+		} else {
+			statusEl.createEl('div', { 
+				text: '⚠️ Personal Access Token required', 
 				cls: 'gitlab-status-warning'
 			});
 		}

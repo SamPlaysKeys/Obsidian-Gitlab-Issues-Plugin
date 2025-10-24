@@ -89,3 +89,6 @@ test-note.md
 # Rollup cache
 .rollup.cache/
 
+# Related docs for testing
+references/
+

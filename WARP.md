@@ -6,9 +6,13 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 This is an Obsidian plugin that creates GitLab issues directly from markdown notes. The plugin allows users to:
 - Select from accessible GitLab projects dynamically
+- **Mark projects as favorites** for quick access (⭐ icon)
+- **Search all projects remotely** using `??` prefix for fuzzy search
 - Create issues with file name as title and content as description
 - Automatically update note frontmatter with issue URLs
 - Support both GitLab.com and self-hosted instances
+- **Test GitLab connection** directly from settings
+- **Toggle token visibility** and copy to clipboard in settings
 
 ## Development Commands
 
@@ -19,15 +23,17 @@ npm install
 
 ### Build Commands
 ```bash
-# Development build with watch mode
+# Development build with watch mode (esbuild)
 npm run dev
 
-# Production build
+# Production build (esbuild)
 npm run build
 
 # Watch mode (alternative)
 npm run watch
 ```
+
+**Note**: The plugin now uses esbuild for significantly faster builds compared to the previous Rollup setup.
 
 ### Makefile Shortcuts
 ```bash
@@ -51,48 +57,65 @@ Then reload Obsidian or restart with Developer Console open to see logs.
 
 ## Code Architecture
 
-### File Structure
-- **`main.ts`** - Main plugin class, settings tab, and ProjectPickerModal
-- **`types.ts`** - GitLab API types and `fetchUserProjects()` utility
-- **`styles.css`** - Custom CSS for project picker modal and settings UI
-- **`rollup.config.js`** - Build configuration (TypeScript → CommonJS)
+### File Structure (Modular Architecture)
+- **`main.ts`** - Main plugin class and orchestration (196 lines, down from 702)
+- **`lib/settings.ts`** - Enhanced settings tab with token visibility toggle, copy, and test connection
+- **`lib/modal.ts`** - Project picker modal with favorites and remote search (`??` prefix)
+- **`lib/utils.ts`** - Shared utilities for API calls, validation, and transformations (359 lines)
+- **`types.ts`** - GitLab API type definitions
+- **`styles.css`** - Custom CSS with favorites, spinner, and enhanced layouts
+- **`esbuild.config.mjs`** - Build configuration (esbuild for fast bundling)
 - **`manifest.json`** - Plugin metadata (id, version, author)
 
 ### Core Components
 
 #### 1. GitLabPlugin (main.ts)
-The main plugin class extends Obsidian's `Plugin`:
-- **Settings Management**: Loads/saves token, labels, and GitLab URL
+The main plugin class extends Obsidian's `Plugin` and focuses on orchestration:
+- **Settings Management**: Loads/saves settings with backward compatibility (auto-migrates deprecated fields)
 - **Command Registration**: Registers "Create GitLab issue from active file" command
-- **Issue Creation Flow**: Validates file → shows project picker → creates issue → updates frontmatter
+- **Issue Creation Flow**: Validates file → shows project picker → creates issue with status bar spinner → updates frontmatter
 
 Key methods:
 - `createIssueFromActiveFile()` - Entry point for issue creation
-- `triggerIssueCreation(file, projectId)` - Handles actual issue creation
-- `createGitLabIssue(title, content, projectId)` - Makes GitLab API POST request
-- `transformMarkdownForGitLab(content)` - Strips frontmatter, converts wikilinks
-- `updateNoteFrontmatter(file, issueUrl)` - Adds/updates `gitlab_issue_url` field
+- `createIssueWithProgress(file, projectId)` - Creates issue with animated status bar spinner
 
-#### 2. ProjectPickerModal (main.ts)
-Extends `FuzzySuggestModal<GitLabProject>` for searchable project selection:
+**All utility functions moved to `lib/utils.ts` for better modularity**
+
+#### 2. ProjectPickerModal (lib/modal.ts)
+Extends `FuzzySuggestModal<GitLabProject>` for searchable project selection with favorites:
 - **Promise-based API**: `selectProject()` returns `Promise<GitLabProject | null>`
 - **Async Loading**: Fetches projects on open with caching
-- **Custom Rendering**: Shows project name, path, and description
+- **Favorites**: Click star icon to toggle favorites; favorites appear first
+- **Remote Search**: Type `??` followed by search term for remote GitLab API search (debounced)
+- **Custom Rendering**: Shows project name, path, description, and favorite star
 
 Selection flow:
 1. Modal opens and calls `loadProjectsAsync()`
 2. `fetchUserProjects()` retrieves all accessible projects (with pagination)
-3. User searches/selects project via fuzzy matching
-4. `selectSuggestion()` stores selection and closes modal
-5. `onClose()` resolves promise with selected project
+3. Projects sorted with favorites first, then alphabetically
+4. User searches locally OR uses `??` for remote search
+5. User can toggle favorites by clicking star icon
+6. `selectSuggestion()` stores selection and closes modal
+7. `onClose()` resolves promise with selected project
 
-#### 3. GitLab API Integration (types.ts)
+#### 3. GitLab API Integration (lib/utils.ts)
 
 **`fetchUserProjects(token, baseUrl)`** - Fetches all user projects with pagination:
 - Uses `GET /api/v4/projects?membership=true&simple=true&per_page=100&page={n}`
 - Handles pagination via `X-Next-Page` header
 - Returns `GitLabProject[]` with id, name, path_with_namespace, description, web_url
 - 30-second timeout with comprehensive error handling
+
+**`searchProjects(token, baseUrl, query)`** - Remote project search:
+- Uses `GET /api/v4/projects?membership=true&simple=true&search={query}&per_page=50`
+- Triggered when user types `??` prefix in project picker
+- Debounced (300ms) to avoid excessive API calls
+- Merges results with cached projects and deduplicates
+
+**`testConnection(token, baseUrl)`** - Test GitLab connection:
+- Uses `GET /api/v4/user` to validate credentials
+- Returns success with username or error message
+- Used by "Test Connection" button in settings
 
 **Issue Creation** (in main.ts):
 - Uses `POST /api/v4/projects/{projectId}/issues`
@@ -107,10 +130,14 @@ Selection flow:
   token: string;           // Personal Access Token (api scope)
   defaultLabels: string;   // Comma-separated labels
   gitlabUrl: string;       // Defaults to https://gitlab.com
+  favProjects: number[];   // Array of favorite project IDs
 }
 ```
 
-**Migration Handling:** The plugin automatically removes deprecated `projectId` setting from older versions during `loadSettings()`.
+**Migration Handling:** The plugin automatically:
+- Removes deprecated `projectId` setting from older versions
+- Adds `favProjects` array if missing (defaults to empty array)
+- Maintains full backward compatibility with existing installations
 
 ### Frontmatter Management
 
@@ -154,23 +181,35 @@ Both `fetchUserProjects()` and `createGitLabIssue()` use consistent error handli
 ## Development Notes
 
 ### Build System
-- **Bundler**: Rollup with rollup-plugin-typescript2
-- **Output**: Single `main.js` file in CommonJS format
-- **Source maps**: Inline source maps for debugging
+- **Bundler**: esbuild (significantly faster than Rollup)
+- **Output**: Single `main.js` file in CommonJS format (25KB optimized)
+- **Source maps**: Inline source maps in development, none in production
+- **Tree shaking**: Enabled for optimal bundle size
 - **External**: Obsidian API not bundled (provided by Obsidian)
+- **Watch mode**: Built-in watch mode for rapid development
 
 ### TypeScript Configuration
-- **Target**: ES6
-- **Module**: ESNext (Rollup handles conversion to CommonJS)
+- **Target**: ES2018
+- **Module**: ESNext (esbuild handles conversion to CommonJS)
+- **Module Resolution**: Bundler mode
 - **Strict mode**: Enabled
-- **Declaration files**: Generated (.d.ts files)
+- **No Emit**: TypeScript only for type-checking; esbuild handles compilation
 
 ### Styling
 Custom CSS classes use Obsidian CSS variables for theme compatibility:
 - `--text-normal`, `--text-muted`, `--text-faint` for colors
 - `--font-monospace` for code/paths
 - `--background-secondary` for backgrounds
+- `--background-modifier-hover` for hover states
 - `--color-green-rgb`, `--color-orange-rgb` for status indicators
+- `--color-yellow` for favorite stars
+- `--interactive-accent` for spinner animation
+
+#### New CSS Classes
+- `.gitlab-project-row` - Flex container for project items with favorites
+- `.fav-icon` and `.is-fav` - Favorite star icon with active state
+- `.gl-spinner` - Animated spinner for status bar
+- `.gitlab-status-bar` - Status bar container with flex layout
 
 ## Testing Workflow
 
@@ -181,11 +220,24 @@ Custom CSS classes use Obsidian CSS variables for theme compatibility:
 5. Test with a markdown file using the command palette (Ctrl/Cmd+P)
 
 ### Common Test Scenarios
-- Test with invalid/missing token → should show clear error
-- Test with no active file → should show "No active file" notice
-- Test with non-markdown file → should show "not a markdown file" notice
-- Test project selection cancellation → should show cancellation notice
-- Test successful issue creation → check frontmatter and GitLab issue
+- **Settings Tab:**
+  - Toggle token visibility with eye/eye-off icon
+  - Copy token to clipboard and verify success notice
+  - Test connection with valid/invalid credentials
+  - Verify settings persist after reload
+- **Project Picker:**
+  - Toggle favorites and verify star icon fills
+  - Confirm favorites appear at top of list
+  - Test `??` prefix for remote search
+  - Verify search results merge and deduplicate
+- **Issue Creation:**
+  - Test with invalid/missing token → should show clear error
+  - Test with no active file → should show "No active file" notice
+  - Test with non-markdown file → should show "not a markdown file" notice
+  - Test project selection cancellation → should show cancellation notice
+  - Verify status bar spinner appears and disappears
+  - Test successful issue creation → check frontmatter and GitLab issue
+  - Test with self-hosted GitLab URL (with/without trailing slash)
 
 ## GitLab API Requirements
 

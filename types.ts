@@ -15,6 +15,20 @@
  *   console.error('Failed to fetch projects:', error.message);
  * }
  */
+/**
+ * Configuration settings for the GitLab plugin
+ */
+export interface GitLabSettings {
+	/** GitLab Personal Access Token for API authentication */
+	token: string;
+	/** Comma-separated list of default labels to apply to created issues */
+	defaultLabels: string;
+	/** Base URL of the GitLab instance */
+	gitlabUrl: string;
+	/** Array of favorite project IDs for quick access */
+	favProjects: number[];
+}
+
 export interface GitLabProject {
 	id: number;
 	name: string;

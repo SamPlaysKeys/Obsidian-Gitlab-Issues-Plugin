@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-gitlab-issues-plugin",
 	"name": "GitLab Issues Plugin",
-	"version": "1.0.1",
+	"version": "2.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "A plugin for integrating GitLab issue functionality into Obsidian",
 	"author": "Sam Fleming",
